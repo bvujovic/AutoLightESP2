@@ -1,0 +1,32 @@
+body {
+    background-color: #000;
+    color: #fff;
+    font-family: 'Segoe UI', Verdana, sans-serif; 
+}
+.clear {
+    clear: both;
+}
+input[type="number"] {
+    width: 75px;
+    text-align: right;
+    font-size: 100%;
+}
+#tblParams {
+    margin: 10px;
+}
+#tblCurrData {
+    margin: 10px;
+}
+th, td {
+    padding: 5px;
+}
+#btnOk {
+    margin: 30px 70px;
+    width: 100px;
+}
+.big {
+    font-size: 150%;
+}
+a {
+    color: green;
+}
