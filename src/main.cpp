@@ -25,7 +25,7 @@ int backlightLimitLow;   // granica pozadinskog osvetljenja iznad koje se svetlo
 int backlightLimitHigh;  // granica pozadinskog osvetljenja ispod koje se svetlo ne gasi
 int backlightLimit;      // granica pozadinskog osvetljenja ...
 int wifiOn;              // broj sekundi za koje wifi ostaje ukljucen; 0 -> wifi je uvek ukljucen
-bool isServerOn = false; // da li wifi i veb server treba da budu ukljuceni
+bool isWiFiOn = false;   // da li wifi i veb server treba da budu ukljuceni
 long msBtnStart = -1;    // millis za pocetak pritiska na taster
 long msLastServerAction; // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
 long msLastPir = -1;     // poslednji put kada je signal sa PIRa bio HIGH
@@ -101,13 +101,11 @@ void ReadConfigFile()
     }
 
     backlightLimit = backlightLimitLow;
-    if (DEBUG)
-    {
-        Serial.println(lightOn);
-        Serial.println(backlightLimitLow);
-        Serial.println(backlightLimitHigh);
-        Serial.println(wifiOn);
-    }
+    // T
+    //     Serial.println(lightOn);
+    //     Serial.println(backlightLimitLow);
+    //     Serial.println(backlightLimitHigh);
+    //     Serial.println(wifiOn);
 }
 
 void WriteParamToFile(File &fp, const char *pname)
@@ -139,14 +137,14 @@ void HandleSaveConfig()
     }
     server.send(200, "text/plain", "");
 
-    if (wifiOn == 0 && !isServerOn)
+    if (wifiOn == 0 && !isWiFiOn)
         RestartForWiFi(true);
 }
 
 void HandleTest()
 {
     Serial.println("test page started");
-    server.send(200, "text/html", "<h1>You are connected</h1>");
+    server.send(200, "text/html", "<h1>Test: You are connected</h1>");
     Serial.println("test page ended");
 }
 
@@ -168,6 +166,21 @@ void SetLight(bool isOn)
     analogWrite(pinLight, isOn ? lightLevel : 0);
 }
 
+void HandleNotFound()
+{
+    String s = "Page Not Found\n\n";
+    s += "URI: ";
+    s += server.uri();
+    s += "\nMethod: ";
+    s += (server.method() == HTTP_GET) ? "GET" : "POST";
+    s += "\nArguments: ";
+    s += server.args();
+    s += "\n";
+    for (int i = 0; i < server.args(); i++)
+        s += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+    server.send(404, "text/plain", s);
+}
+
 void setup()
 {
     pinMode(pinPIR, INPUT);
@@ -182,12 +195,12 @@ void setup()
     ReadConfigFile();
 
     EEPROM.begin(512);
-    isServerOn = wifiOn == 0 ? true : EEPROM.read(eepromPos);
+    isWiFiOn = wifiOn == 0 ? true : EEPROM.read(eepromPos);
 
-    SetLight(isServerOn); // ako se pali WiFi, svetlo je upaljeno
-    backlightLimit = isServerOn ? backlightLimitHigh : backlightLimitLow;
+    SetLight(isWiFiOn); // ako se pali WiFi, svetlo je upaljeno
+    backlightLimit = isWiFiOn ? backlightLimitHigh : backlightLimitLow;
 
-    if (isServerOn)
+    if (isWiFiOn)
     {
         ConnectToWiFi();
         SetupIPAddress(40);
@@ -202,6 +215,7 @@ void setup()
         server.on("/current_data.html", []() { HandleDataFile(server, "/current_data.html", "text/html"); });
         server.on("/inc/current_data.js", []() { HandleDataFile(server, "/inc/current_data.js", "text/javascript"); });
         server.on("/get_status", HandleGetStatus);
+        server.onNotFound(HandleNotFound);
         server.begin();
         msLastStatus = msLastServerAction = millis();
         if (DEBUG)
@@ -242,19 +256,18 @@ void loop()
     if (valPhotoRes > 1000) // ako je pritisnut taster nabudzen sa LDRom
     {
         if (msBtnStart == -1)
-            msBtnStart = ms;                            // pamti se pocetak pritiska na taster
-        else if (ms - msBtnStart > 1000 && !isServerOn) // ako se taster drzi vise od sekunde
+            msBtnStart = ms;                          // pamti se pocetak pritiska na taster
+        else if (ms - msBtnStart > 1000 && !isWiFiOn) // ako se taster drzi vise od sekunde
             RestartForWiFi(true);
     }
     else
         msBtnStart = -1;
 
-    digitalWrite(pinLed, !isServerOn);
-    if (isServerOn)
+    digitalWrite(pinLed, !isWiFiOn);
+    if (isWiFiOn)
     {
         if (ms - msLastStatus > 1000)
         {
-            int wiFiCountdown = wifiOn - (ms - msLastServerAction) / 1000;
             AddStatusString(idStatus++, valPhotoRes, (ms - msLastPir) / 1000, isLightOn);
             msLastStatus = ms;
         }
