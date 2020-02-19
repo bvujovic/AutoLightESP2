@@ -5,6 +5,9 @@
 #include <WiFiServerBasics.h>
 ESP8266WebServer server(80);
 
+#include "LdrVals.h"
+LdrVals ldrs;
+
 #define DEBUG true
 
 // pins
@@ -18,7 +21,10 @@ const int pinLed = 2;     // ugradjena LED dioda na ESPu - upaljena kada radi wi
 
 // variables
 char configFilePath[] = "/config.ini";
+int msMainDelay;         // broj milisekundi delay-a u loop-u
 int lightLevel = 255;    // jacina LED svetla (0-255)
+int lightOutDelay;       // delay u ms posle gasenja svetla
+int minHighPIRs;         // minimalan broj uzastopnih PIR HIGH signala da bi se to prihvatilo kao detektovani pokret
 bool isLightOn;          // da li je svetlo upaljeno ili ne
 int lightOn;             // koliko je sekundi svetlo upaljeno posle poslednjeg signala sa PIR-a
 int backlightLimitLow;   // granica pozadinskog osvetljenja iznad koje se svetlo ne pali
@@ -91,6 +97,12 @@ void ReadConfigFile()
                 backlightLimitHigh = value.toInt();
             if (name.equals("wifiOn"))
                 wifiOn = value.toInt();
+            if (name.equals("lightOutDelay"))
+                lightOutDelay = value.toInt();
+            if (name.equals("minHighPIRs"))
+                minHighPIRs = value.toInt();
+            if (name.equals("msMainDelay"))
+                msMainDelay = value.toInt();
         }
         fp.close();
     }
@@ -102,10 +114,14 @@ void ReadConfigFile()
 
     backlightLimit = backlightLimitLow;
     // T
-    //     Serial.println(lightOn);
-    //     Serial.println(backlightLimitLow);
-    //     Serial.println(backlightLimitHigh);
-    //     Serial.println(wifiOn);
+    Serial.println(lightOn);
+    Serial.println(lightLevel);
+    Serial.println(backlightLimitLow);
+    Serial.println(backlightLimitHigh);
+    Serial.println(wifiOn);
+    Serial.println(lightOutDelay);
+    Serial.println(minHighPIRs);
+    Serial.println(msMainDelay);
 }
 
 void WriteParamToFile(File &fp, const char *pname)
@@ -143,9 +159,7 @@ void HandleSaveConfig()
 
 void HandleTest()
 {
-    Serial.println("test page started");
     server.send(200, "text/html", "<h1>Test: You are connected</h1>");
-    Serial.println("test page ended");
 }
 
 void HandleGetStatus()
@@ -160,10 +174,17 @@ void HandleGetStatus()
         server.send(204, "text/x-csv", "");
 }
 
+void HandleLdrVals()
+{
+    server.send(200, "text/html", ldrs.PrintAll());
+}
+
 void SetLight(bool isOn)
 {
-    isLightOn = isOn;
     analogWrite(pinLight, isOn ? lightLevel : 0);
+    if (isLightOn && !isOn) // svetlo se upravo gasi
+        delay(lightOutDelay);
+    isLightOn = isOn;
 }
 
 void HandleNotFound()
@@ -215,6 +236,7 @@ void setup()
         server.on("/current_data.html", []() { HandleDataFile(server, "/current_data.html", "text/html"); });
         server.on("/inc/current_data.js", []() { HandleDataFile(server, "/inc/current_data.js", "text/javascript"); });
         server.on("/get_status", HandleGetStatus);
+        server.on("/get_ldr_vals", HandleLdrVals);
         server.onNotFound(HandleNotFound);
         server.begin();
         msLastStatus = msLastServerAction = millis();
@@ -234,9 +256,11 @@ void loop()
     int valPir = digitalRead(pinPIR);
     consPirs = valPir ? consPirs + 1 : 0;
 
-    if (consPirs > 5) // HIGH na PIR-u se prihvata samo ako je ta vrednost 5 puta zaredom ocitana
+    if (consPirs > minHighPIRs) // HIGH na PIR-u se prihvata samo ako je ta vrednost x puta zaredom ocitana
         msLastPir = ms;
     int valPhotoRes = analogRead(pinPhotoRes);
+    valPhotoRes = ldrs.Add(valPhotoRes);
+
     if (valPhotoRes > backlightLimit) // prostorija je dovoljno osvetljena
     {
         SetLight(false);
@@ -279,5 +303,5 @@ void loop()
         server.handleClient();
     }
 
-    delay(10);
+    delay(msMainDelay);
 }

@@ -24,7 +24,10 @@ function GetConfig() {
 lightLevel=255
 backlightLimitLow=200
 backlightLimitHigh=400
-wifiOn=1234`;
+wifiOn=1234
+lightOutDelay=200
+minHighPIRs=3
+msMainDelay=12`;
         ParseConfig(resp);
     }
     else {
@@ -56,6 +59,9 @@ function DisplayConfig() {
     docel('numBacklightLimitLow').value = ConfValue('backlightLimitLow');
     docel('numBacklightLimitHigh').value = ConfValue('backlightLimitHigh');
     docel('numWifiOn').value = ConfValue('wifiOn');
+    docel('numLightOutDelay').value = ConfValue('lightOutDelay');
+    docel('numMinHighPIRs').value = ConfValue('minHighPIRs');
+    docel('numMsMainDelay').value = ConfValue('msMainDelay');
 }
 
 function ConfValue(confName) {
@@ -72,7 +78,10 @@ function SaveConfig() {
         + 'lightLevel' + sepProps + docel('numLightLevel').value + sepParams
         + 'backlightLimitLow' + sepProps + docel('numBacklightLimitLow').value + sepParams
         + 'backlightLimitHigh' + sepProps + docel('numBacklightLimitHigh').value + sepParams
-        + 'wifiOn' + sepProps + docel('numWifiOn').value;
+        + 'wifiOn' + sepProps + docel('numWifiOn').value + sepParams
+        + 'lightOutDelay' + sepProps + docel('numLightOutDelay').value + sepParams
+        + 'minHighPIRs' + sepProps + docel('numMinHighPIRs').value + sepParams
+        + 'msMainDelay' + sepProps + docel('numMsMainDelay').value;
 
     if (TEST)
         console.log(confData);

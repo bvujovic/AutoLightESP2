@@ -36,6 +36,18 @@
                     <td>WiFi On</td>
                     <td><input type="number" id="numWifiOn" min="0" max="3600" size="3"> seconds (0 -> WiFi is always on)</td>
                 </tr>
+                <tr>
+                    <td>Delay after light out</td>
+                    <td><input type="number" id="numLightOutDelay" min="0" max="2000" size="3"> milliseconds</td>
+                </tr>
+                <tr>
+                    <td>Minimal PIR HIGHs</td>
+                    <td><input type="number" id="numMinHighPIRs" min="1" max="100" size="3"> ... to be taken as movement detection/td>
+                </tr>
+                <tr>
+                    <td>Loop's delay</td>
+                    <td><input type="number" id="numMsMainDelay" min="5" max="500" size="3"> milliseconds</td>
+                </tr>
             </table>
             <input type="button" id='btnOk' value="OK" onclick="SaveConfig()" class="big">
         </form>
