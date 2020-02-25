@@ -35,7 +35,8 @@ bool isWiFiOn = false;   // da li wifi i veb server treba da budu ukljuceni
 long msBtnStart = -1;    // millis za pocetak pritiska na taster
 long msLastServerAction; // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
 long msLastPir = -1;     // poslednji put kada je signal sa PIRa bio HIGH
-int consPirs = 0;        // broj uzastopnih pinPIR HIGH vrednosti
+long msStartPir = -1;    // pocetak HIGH PIR signala pri dovoljno jakom pozadinskom osvetljenju
+int consecPirs = 0;      // broj uzastopnih pinPIR HIGH vrednosti
 int i = 0;
 
 LinkedList<String> statuses = LinkedList<String>(); // lista statusa aparata
@@ -254,21 +255,33 @@ void loop()
 {
     long ms = millis();
     int valPir = digitalRead(pinPIR);
-    consPirs = valPir ? consPirs + 1 : 0;
+    consecPirs = valPir ? consecPirs + 1 : 0;
 
-    if (consPirs > minHighPIRs) // HIGH na PIR-u se prihvata samo ako je ta vrednost x puta zaredom ocitana
+    if (consecPirs >= minHighPIRs) // HIGH na PIR-u se prihvata samo ako je ta vrednost x puta zaredom ocitana
         msLastPir = ms;
+    if (!valPir && msStartPir != -1)
+    {
+        msStartPir = -1;
+        msLastPir = -1;
+        //T Serial.println("msStartPir -1");
+    }
+
     int valPhotoRes = analogRead(pinPhotoRes);
     valPhotoRes = ldrs.Add(valPhotoRes);
 
     if (valPhotoRes > backlightLimit) // prostorija je dovoljno osvetljena
     {
+        if (consecPirs == minHighPIRs) // pokret zapocet kada je prostorija dovoljno osvetljena
+        {
+            msStartPir = ms;
+            //T Serial.println("msStartPir 1");
+        }
         SetLight(false);
         backlightLimit = backlightLimitLow;
     }
     else // prostorija nije dovoljno osvetljena
     {
-        if (msLastPir != -1 && ms - msLastPir < 1000 * lightOn)
+        if (msLastPir != -1 && ms - msLastPir < 1000 * lightOn && msStartPir == -1)
         {
             backlightLimit = backlightLimitHigh;
             SetLight(true);

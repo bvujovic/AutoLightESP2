@@ -55,14 +55,14 @@ String LdrVals::PrintAll()
         s += vals[j];
         s += '\t';
         s += valsAvg[j];
-        s += '\n';
+        s += "<br>";
     }
     for (int j = 0; j < cnt; j++)
     {
         s += vals[j];
         s += '\t';
         s += valsAvg[j];
-        s += '\n';
+        s += "<br>";
     }
     return s;
 }
