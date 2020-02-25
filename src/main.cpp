@@ -112,6 +112,15 @@ void ReadConfigFile()
         Serial.print(configFilePath);
         Serial.println(" open (r) faaail.");
     }
+    // provera tj. stavljanje parametara aplikacije u prihvatljiv opseg
+    lightOn = constrain(lightOn, 1, 3600);
+    lightLevel = constrain(lightLevel, 1, PWMRANGE);
+    backlightLimitLow = constrain(backlightLimitLow, 1, PWMRANGE);
+    backlightLimitHigh = constrain(backlightLimitHigh, 1, PWMRANGE);
+    wifiOn = constrain(wifiOn, 0, 3600);
+    lightOutDelay = constrain(lightOutDelay, 0, 2000);
+    minHighPIRs = constrain(minHighPIRs, 1, 100);
+    msMainDelay = constrain(msMainDelay, 5, 500);
 
     backlightLimit = backlightLimitLow;
     // T
@@ -134,7 +143,7 @@ void WriteParamToFile(File &fp, const char *pname)
 
 void HandleSaveConfig()
 {
-    // lightOn=6&backlightLimitLow=200&backlightLimitHigh=400&wifiOn=2200
+    // lightOn=6&backlightLimitLow=200&backlightLimitHigh=400&wifiOn=2200...
     msLastServerAction = millis();
     File fp = SPIFFS.open(configFilePath, "w");
     if (fp)
@@ -144,6 +153,9 @@ void HandleSaveConfig()
         WriteParamToFile(fp, "backlightLimitLow");
         WriteParamToFile(fp, "backlightLimitHigh");
         WriteParamToFile(fp, "wifiOn");
+        WriteParamToFile(fp, "lightOutDelay");
+        WriteParamToFile(fp, "minHighPIRs");
+        WriteParamToFile(fp, "msMainDelay");
         fp.close();
         ReadConfigFile();
     }
