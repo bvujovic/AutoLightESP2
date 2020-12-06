@@ -6,11 +6,9 @@ const maxCnt = 10;
 const sepRows = '\n';
 const sepData = ';';
 
-//B var myVar = 
 setInterval(myTimer, 1000);
 
 function myTimer() {
-    
     getStatus();
 }
 

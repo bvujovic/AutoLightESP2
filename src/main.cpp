@@ -5,6 +5,9 @@
 #include <WiFiServerBasics.h>
 ESP8266WebServer server(80);
 
+#include <ArduinoOTA.h>
+bool isOtaOn = false; // da li je OTA update u toku
+
 #include "LdrVals.h"
 LdrVals ldrs;
 
@@ -73,7 +76,7 @@ void RestartForWiFi(bool nextWiFiOn)
 void ReadConfigFile()
 {
     msLastServerAction = millis();
-    File fp = SPIFFS.open(configFilePath, "r");
+    File fp = LittleFS.open(configFilePath, "r");
     if (fp)
     {
         while (fp.available())
@@ -145,7 +148,7 @@ void HandleSaveConfig()
 {
     // lightOn=6&backlightLimitLow=200&backlightLimitHigh=400&wifiOn=2200...
     msLastServerAction = millis();
-    File fp = SPIFFS.open(configFilePath, "w");
+    File fp = LittleFS.open(configFilePath, "w");
     if (fp)
     {
         WriteParamToFile(fp, "lightOn");
@@ -225,7 +228,7 @@ void setup()
     SetLight(false);
 
     Serial.begin(115200);
-    SPIFFS.begin();
+    LittleFS.begin();
     ReadConfigFile();
 
     EEPROM.begin(512);
@@ -250,6 +253,7 @@ void setup()
         server.on("/inc/current_data.js", []() { HandleDataFile(server, "/inc/current_data.js", "text/javascript"); });
         server.on("/get_status", HandleGetStatus);
         server.on("/get_ldr_vals", HandleLdrVals);
+        server.on("/otaUpdate", []() { server.send(200, "text/plain", "ESP is waiting for OTA updates..."); isOtaOn = true; ArduinoOTA.begin(); });
         server.onNotFound(HandleNotFound);
         server.begin();
         msLastStatus = msLastServerAction = millis();
@@ -265,6 +269,13 @@ void setup()
 
 void loop()
 {
+    delay(msMainDelay);
+
+    if (isOtaOn)
+        ArduinoOTA.handle();
+    else
+        server.handleClient();
+
     long ms = millis();
     int valPir = digitalRead(pinPIR);
     consecPirs = valPir ? consecPirs + 1 : 0;
@@ -327,6 +338,4 @@ void loop()
 
         server.handleClient();
     }
-
-    delay(msMainDelay);
 }
