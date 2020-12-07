@@ -4,7 +4,7 @@
 <head>
     <meta charset='utf-8'>
     <title>AutoLight ESP Bathroom</title>
-    <link rel="icon" href="inc/bathroom_light.png" type="image/png" />
+    <link rel="icon" href="inc/wifi_light_128.png" type="image/png" />
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link href="inc/style.css" rel="stylesheet" type="text/css">
     <script src="inc/index.js" type="text/javascript" language="JavaScript"></script>
@@ -22,19 +22,20 @@
                 </tr>
                 <tr>
                     <td>Light Level</td>
-                    <td><input type="number" id="numLightLevel" min="1" max="1023"> (min 1, max 1023)</td>
+                    <td><input type="number" id="numLightLevel" min="1" max="100"> (min 1, max 100)</td>
                 </tr>
                 <tr>
                     <td>Backlight Limit Low</td>
-                    <td><input type="number" id="numBacklightLimitLow" min="1" max="1023"> (min 1, max 1023)</td>
+                    <td><input type="number" id="numBacklightLimitLow" min="1" max="100"> (min 1, max 100)</td>
                 </tr>
                 <tr>
                     <td>Backlight Limit High</td>
-                    <td><input type="number" id="numBacklightLimitHigh" min="1" max="1023"> (min 1, max 1023)</td>
+                    <td><input type="number" id="numBacklightLimitHigh" min="1" max="100"> (min 1, max 100)</td>
                 </tr>
                 <tr>
                     <td>WiFi On</td>
-                    <td><input type="number" id="numWifiOn" min="0" max="3600" size="3"> seconds (0 -> WiFi is always on)</td>
+                    <td><input type="number" id="numWifiOn" min="0" max="3600" size="3"> seconds (0 -> WiFi is always
+                        on)</td>
                 </tr>
                 <tr>
                     <td>Delay after light out</td>
@@ -42,7 +43,8 @@
                 </tr>
                 <tr>
                     <td>Minimal PIR HIGHs</td>
-                    <td><input type="number" id="numMinHighPIRs" min="1" max="100" size="3"> to be taken as movement detection</td>
+                    <td><input type="number" id="numMinHighPIRs" min="1" max="100" size="3"> to be taken as movement
+                        detection</td>
                 </tr>
                 <tr>
                     <td>Loop's delay</td>
@@ -53,8 +55,9 @@
         </form>
 
         <p class="big">
-            <a href="current_data.html">Current data</a><br>
-            <a href="get_ldr_vals">Last n LDR values (raw data)</a>            
+            <a href="current_data.html">Current Data</a> <br>
+            <a href="get_ldr_vals">Last n LDR Values (raw data)</a> <br>
+            <a href="otaUpdate">OTA Update</a>
         </p>
     </div>
 </body>

@@ -11,6 +11,9 @@ bool isOtaOn = false; // da li je OTA update u toku
 #include "LdrVals.h"
 LdrVals ldrs;
 
+#include "EasyINI.h"
+EasyINI ei("/config.ini");
+
 #define DEBUG true
 
 // pins
@@ -18,22 +21,14 @@ LdrVals ldrs;
 const int pinPhotoRes = A0; // pin za LDR i taster za WiFi
 const int pinPIR = D0;
 // OUTPUT
-const int pinLight = D8;  // LED svetlo za osvetljavanje prostorije
+const int pinLight = D8; // LED svetlo za osvetljavanje prostorije
+const int pinLed = 2;    // ugradjena LED dioda na ESPu - upaljena kada radi wifi
+
 const int eepromPos = 88; // pozicija u EEPROMu na kojoj ce se cuvati podatak da li se wifi pali ili ne pri sledecm resetu
-const int pinLed = 2;     // ugradjena LED dioda na ESPu - upaljena kada radi wifi
 
 // variables
-char configFilePath[] = "/config.ini";
-int msMainDelay;         // broj milisekundi delay-a u loop-u
-int lightLevel = 255;    // jacina LED svetla (0-255)
-int lightOutDelay;       // delay u ms posle gasenja svetla
-int minHighPIRs;         // minimalan broj uzastopnih PIR HIGH signala da bi se to prihvatilo kao detektovani pokret
 bool isLightOn;          // da li je svetlo upaljeno ili ne
-int lightOn;             // koliko je sekundi svetlo upaljeno posle poslednjeg signala sa PIR-a
-int backlightLimitLow;   // granica pozadinskog osvetljenja iznad koje se svetlo ne pali
-int backlightLimitHigh;  // granica pozadinskog osvetljenja ispod koje se svetlo ne gasi
 int backlightLimit;      // granica pozadinskog osvetljenja ...
-int wifiOn;              // broj sekundi za koje wifi ostaje ukljucen; 0 -> wifi je uvek ukljucen
 bool isWiFiOn = false;   // da li wifi i veb server treba da budu ukljuceni
 long msBtnStart = -1;    // millis za pocetak pritiska na taster
 long msLastServerAction; // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
@@ -41,6 +36,9 @@ long msLastPir = -1;     // poslednji put kada je signal sa PIRa bio HIGH
 long msStartPir = -1;    // pocetak HIGH PIR signala pri dovoljno jakom pozadinskom osvetljenju
 int consecPirs = 0;      // broj uzastopnih pinPIR HIGH vrednosti
 int i = 0;
+
+#include "Setts.h"
+Setts setts;
 
 LinkedList<String> statuses = LinkedList<String>(); // lista statusa aparata
 int idStatus = 0;
@@ -64,6 +62,15 @@ void AddStatusString(int _id, int _ldr, int _secFromPIR, bool _isLightOn)
     statuses.add(s);
 }
 
+void SetLight(bool isOn)
+{
+    int lvl = map(setts.lightLevel, 0, setts.MAX_LEVEL, 0, PWMRANGE);
+    analogWrite(pinLight, isOn ? lvl : 0);
+    if (isLightOn && !isOn) // svetlo se upravo gasi
+        delay(setts.lightOutDelay);
+    isLightOn = isOn;
+}
+
 // Pamcenje informacije o tome da li ce WiFi biti ukljucen ili ne posle sledeceg paljenja/budjenja aparata i reset
 void RestartForWiFi(bool nextWiFiOn)
 {
@@ -76,100 +83,19 @@ void RestartForWiFi(bool nextWiFiOn)
 void ReadConfigFile()
 {
     msLastServerAction = millis();
-    File fp = LittleFS.open(configFilePath, "r");
-    if (fp)
-    {
-        while (fp.available())
-        {
-            String l = fp.readStringUntil('\n');
-            l.trim();
-            if (l.length() == 0 || l.charAt(0) == ';') // preskacemo prazne stringove i komentare
-                continue;                              //
-            int idx = l.indexOf('=');                  // parsiranje reda u formatu "name=value", npr: moment_mins=10
-            if (idx == -1)
-                break;
-            String name = l.substring(0, idx);
-            String value = l.substring(idx + 1);
-
-            if (name.equals("lightOn"))
-                lightOn = value.toInt();
-            if (name.equals("lightLevel"))
-                lightLevel = value.toInt();
-            if (name.equals("backlightLimitLow"))
-                backlightLimitLow = value.toInt();
-            if (name.equals("backlightLimitHigh"))
-                backlightLimitHigh = value.toInt();
-            if (name.equals("wifiOn"))
-                wifiOn = value.toInt();
-            if (name.equals("lightOutDelay"))
-                lightOutDelay = value.toInt();
-            if (name.equals("minHighPIRs"))
-                minHighPIRs = value.toInt();
-            if (name.equals("msMainDelay"))
-                msMainDelay = value.toInt();
-        }
-        fp.close();
-    }
-    else
-    {
-        Serial.print(configFilePath);
-        Serial.println(" open (r) faaail.");
-    }
-    // provera tj. stavljanje parametara aplikacije u prihvatljiv opseg
-    lightOn = constrain(lightOn, 1, 3600);
-    lightLevel = constrain(lightLevel, 1, PWMRANGE);
-    backlightLimitLow = constrain(backlightLimitLow, 1, PWMRANGE);
-    backlightLimitHigh = constrain(backlightLimitHigh, 1, PWMRANGE);
-    wifiOn = constrain(wifiOn, 0, 3600);
-    lightOutDelay = constrain(lightOutDelay, 0, 2000);
-    minHighPIRs = constrain(minHighPIRs, 1, 100);
-    msMainDelay = constrain(msMainDelay, 5, 500);
-
-    backlightLimit = backlightLimitLow;
-    // T
-    Serial.println(lightOn);
-    Serial.println(lightLevel);
-    Serial.println(backlightLimitLow);
-    Serial.println(backlightLimitHigh);
-    Serial.println(wifiOn);
-    Serial.println(lightOutDelay);
-    Serial.println(minHighPIRs);
-    Serial.println(msMainDelay);
-}
-
-void WriteParamToFile(File &fp, const char *pname)
-{
-    fp.print(pname);
-    fp.print('=');
-    fp.println(server.arg(pname));
+    setts.loadSetts();
+    backlightLimit = setts.backlightLimitLow;
 }
 
 void HandleSaveConfig()
 {
     // lightOn=6&backlightLimitLow=200&backlightLimitHigh=400&wifiOn=2200...
     msLastServerAction = millis();
-    File fp = LittleFS.open(configFilePath, "w");
-    if (fp)
-    {
-        WriteParamToFile(fp, "lightOn");
-        WriteParamToFile(fp, "lightLevel");
-        WriteParamToFile(fp, "backlightLimitLow");
-        WriteParamToFile(fp, "backlightLimitHigh");
-        WriteParamToFile(fp, "wifiOn");
-        WriteParamToFile(fp, "lightOutDelay");
-        WriteParamToFile(fp, "minHighPIRs");
-        WriteParamToFile(fp, "msMainDelay");
-        fp.close();
-        ReadConfigFile();
-    }
-    else
-    {
-        Serial.print(configFilePath);
-        Serial.println(" open (w) faaail.");
-    }
-    server.send(200, "text/plain", "");
+    setts.saveSetts(server);
+    backlightLimit = setts.backlightLimitLow;
+    SendEmptyText(server);
 
-    if (wifiOn == 0 && !isWiFiOn)
+    if (setts.wifiOn == 0 && !isWiFiOn)
         RestartForWiFi(true);
 }
 
@@ -193,14 +119,6 @@ void HandleGetStatus()
 void HandleLdrVals()
 {
     server.send(200, "text/html", ldrs.PrintAll());
-}
-
-void SetLight(bool isOn)
-{
-    analogWrite(pinLight, isOn ? lightLevel : 0);
-    if (isLightOn && !isOn) // svetlo se upravo gasi
-        delay(lightOutDelay);
-    isLightOn = isOn;
 }
 
 void HandleNotFound()
@@ -232,22 +150,22 @@ void setup()
     ReadConfigFile();
 
     EEPROM.begin(512);
-    isWiFiOn = wifiOn == 0 ? true : EEPROM.read(eepromPos);
+    isWiFiOn = setts.wifiOn == 0 ? true : EEPROM.read(eepromPos);
 
     SetLight(isWiFiOn); // ako se pali WiFi, svetlo je upaljeno
-    backlightLimit = isWiFiOn ? backlightLimitHigh : backlightLimitLow;
+    backlightLimit = isWiFiOn ? setts.backlightLimitHigh : setts.backlightLimitLow;
 
     if (isWiFiOn)
     {
         ConnectToWiFi();
         SetupIPAddress(40);
 
-        server.on("/inc/bathroom_light.png", []() { HandleDataFile(server, "/inc/bathroom_light.png", "image/png"); });
+        server.on("/inc/wifi_light_128.png", []() { HandleDataFile(server, "/inc/wifi_light_128.png", "image/png"); });
         server.on("/test", HandleTest);
         server.on("/", []() { HandleDataFile(server, "/index.html", "text/html"); });
         server.on("/inc/index.js", []() { HandleDataFile(server, "/inc/index.js", "text/javascript"); });
         server.on("/inc/style.css", []() { HandleDataFile(server, "/inc/style.css", "text/css"); });
-        server.on(configFilePath, []() { HandleDataFile(server, configFilePath, "text/x-csv"); });
+        server.on(ei.getFileName(), []() { HandleDataFile(server, ei.getFileName(), "text/x-csv"); });
         server.on("/save_config", HandleSaveConfig);
         server.on("/current_data.html", []() { HandleDataFile(server, "/current_data.html", "text/html"); });
         server.on("/inc/current_data.js", []() { HandleDataFile(server, "/inc/current_data.js", "text/javascript"); });
@@ -269,7 +187,7 @@ void setup()
 
 void loop()
 {
-    delay(msMainDelay);
+    delay(setts.msMainDelay);
 
     if (isOtaOn)
         ArduinoOTA.handle();
@@ -280,40 +198,39 @@ void loop()
     int valPir = digitalRead(pinPIR);
     consecPirs = valPir ? consecPirs + 1 : 0;
 
-    if (consecPirs >= minHighPIRs) // HIGH na PIR-u se prihvata samo ako je ta vrednost x puta zaredom ocitana
+    if (consecPirs >= setts.minHighPIRs) // HIGH na PIR-u se prihvata samo ako je ta vrednost x puta zaredom ocitana
         msLastPir = ms;
     if (!valPir && msStartPir != -1)
     {
         msStartPir = -1;
         msLastPir = -1;
-        //T Serial.println("msStartPir -1");
     }
 
-    int valPhotoRes = analogRead(pinPhotoRes);
+    int valPhotoRes = map(analogRead(pinPhotoRes), 0, 1023, 0, setts.MAX_LEVEL);
     valPhotoRes = ldrs.Add(valPhotoRes);
 
     if (valPhotoRes > backlightLimit) // prostorija je dovoljno osvetljena
     {
-        if (consecPirs == minHighPIRs) // pokret zapocet kada je prostorija dovoljno osvetljena
+        if (consecPirs == setts.minHighPIRs) // pokret zapocet kada je prostorija dovoljno osvetljena
         {
             msStartPir = ms;
             //T Serial.println("msStartPir 1");
         }
         SetLight(false);
-        backlightLimit = backlightLimitLow;
+        backlightLimit = setts.backlightLimitLow;
     }
     else // prostorija nije dovoljno osvetljena
     {
-        if (msLastPir != -1 && ms - msLastPir < 1000 * lightOn && msStartPir == -1)
+        if (msLastPir != -1 && ms - msLastPir < 1000 * setts.lightOn && msStartPir == -1)
         {
-            backlightLimit = backlightLimitHigh;
+            backlightLimit = setts.backlightLimitHigh;
             SetLight(true);
         }
         else
             SetLight(false);
     }
 
-    if (valPhotoRes > 1000) // ako je pritisnut taster nabudzen sa LDRom
+    if (valPhotoRes > 0.95 * setts.MAX_LEVEL) // ako je pritisnut taster nabudzen sa LDRom
     {
         if (msBtnStart == -1)
             msBtnStart = ms;                          // pamti se pocetak pritiska na taster
@@ -333,7 +250,7 @@ void loop()
         }
 
         // da li je vreme da se iskljuci WiFi tj. veb server
-        if (wifiOn != 0 && ms - msLastServerAction > 1000 * wifiOn)
+        if (setts.wifiOn != 0 && ms - msLastServerAction > 1000 * setts.wifiOn)
             RestartForWiFi(false);
 
         server.handleClient();
