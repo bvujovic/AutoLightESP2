@@ -24,6 +24,7 @@ void Setts::saveSetts(ESP8266WebServer &server)
 {
     if (ei->open(FMOD_WRITE))
     {
+        // lightOn=41&lightLevel=100&backlightLimitLow=21&backlightLimitHigh=51&wifiOn=121&lightOutDelay=500&minHighPIRs=10&msMainDelay=10
         setLightOn(server.arg("lightOn").toInt());
         setLightLevel(server.arg("lightLevel").toInt());
         setBacklightLimitLow(server.arg("backlightLimitLow").toInt());

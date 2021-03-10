@@ -10,6 +10,7 @@ LdrVals::LdrVals()
 LdrVals::~LdrVals()
 {
     delete[] vals;
+    delete[] valsAvg;
 }
 
 int LdrVals::Add(int val)

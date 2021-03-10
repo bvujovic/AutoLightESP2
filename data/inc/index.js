@@ -51,17 +51,17 @@ function ParseConfig(resp) {
     DisplayConfig();
 }
 
-function docel(id) { return document.getElementById(id); }
+//B function docel(id) { return document.getElementById(id); }
 
 function DisplayConfig() {
-    docel('numLightOn').value = ConfValue('lightOn');
-    docel('numLightLevel').value = ConfValue('lightLevel');
-    docel('numBacklightLimitLow').value = ConfValue('backlightLimitLow');
-    docel('numBacklightLimitHigh').value = ConfValue('backlightLimitHigh');
-    docel('numWifiOn').value = ConfValue('wifiOn');
-    docel('numLightOutDelay').value = ConfValue('lightOutDelay');
-    docel('numMinHighPIRs').value = ConfValue('minHighPIRs');
-    docel('numMsMainDelay').value = ConfValue('msMainDelay');
+    numLightOn.value = ConfValue('lightOn');
+    numLightLevel.value = ConfValue('lightLevel');
+    numBacklightLimitLow.value = ConfValue('backlightLimitLow');
+    numBacklightLimitHigh.value = ConfValue('backlightLimitHigh');
+    numWifiOn.value = ConfValue('wifiOn');
+    numLightOutDelay.value = ConfValue('lightOutDelay');
+    numMinHighPIRs.value = ConfValue('minHighPIRs');
+    numMsMainDelay.value = ConfValue('msMainDelay');
 }
 
 function ConfValue(confName) {
@@ -74,14 +74,14 @@ function ConfValue(confName) {
 function SaveConfig() {
     const sepParams = '&';
     const confData
-        = 'lightOn' + sepProps + docel('numLightOn').value + sepParams
-        + 'lightLevel' + sepProps + docel('numLightLevel').value + sepParams
-        + 'backlightLimitLow' + sepProps + docel('numBacklightLimitLow').value + sepParams
-        + 'backlightLimitHigh' + sepProps + docel('numBacklightLimitHigh').value + sepParams
-        + 'wifiOn' + sepProps + docel('numWifiOn').value + sepParams
-        + 'lightOutDelay' + sepProps + docel('numLightOutDelay').value + sepParams
-        + 'minHighPIRs' + sepProps + docel('numMinHighPIRs').value + sepParams
-        + 'msMainDelay' + sepProps + docel('numMsMainDelay').value;
+        = 'lightOn' + sepProps + numLightOn.value + sepParams
+        + 'lightLevel' + sepProps + numLightLevel.value + sepParams
+        + 'backlightLimitLow' + sepProps + numBacklightLimitLow.value + sepParams
+        + 'backlightLimitHigh' + sepProps + numBacklightLimitHigh.value + sepParams
+        + 'wifiOn' + sepProps + numWifiOn.value + sepParams
+        + 'lightOutDelay' + sepProps + numLightOutDelay.value + sepParams
+        + 'minHighPIRs' + sepProps + numMinHighPIRs.value + sepParams
+        + 'msMainDelay' + sepProps + numMsMainDelay.value;
 
     if (TEST)
         console.log(confData);

@@ -17,25 +17,29 @@
         <form action="">
             <table id='tblParams' class="big" border='0'>
                 <tr>
+                    <td>Light Level</td>
+                    <td> <input type="range" id="numLightLevel" min="1" max="100"> </td>
+                    <!-- https://www.w3schools.com/howto/howto_js_rangeslider.asp -->
+                    <!-- <input type="number" id="numLightLevel" min="1" max="100"> (min 1, max 100) -->
+                </tr>
+                <tr>
                     <td>Light On</td>
                     <td><input type="number" id="numLightOn" min="1" max="3600"> seconds</td>
                 </tr>
                 <tr>
-                    <td>Light Level</td>
-                    <td><input type="number" id="numLightLevel" min="1" max="100"> (min 1, max 100)</td>
-                </tr>
-                <tr>
                     <td>Backlight Limit Low</td>
-                    <td><input type="number" id="numBacklightLimitLow" min="1" max="100"> (min 1, max 100)</td>
+                    <!-- <td><input type="number" id="numBacklightLimitLow" min="1" max="100"> (min 1, max 100)</td> -->
+                    <td><input type="range" id="numBacklightLimitLow" min="1" max="100"></td>
                 </tr>
                 <tr>
                     <td>Backlight Limit High</td>
-                    <td><input type="number" id="numBacklightLimitHigh" min="1" max="100"> (min 1, max 100)</td>
+                    <!-- <td><input type="number" id="numBacklightLimitHigh" min="1" max="100"> (min 1, max 100)</td> -->
+                    <td><input type="range" id="numBacklightLimitHigh" min="1" max="100"></td>
                 </tr>
                 <tr>
                     <td>WiFi On</td>
-                    <td><input type="number" id="numWifiOn" min="0" max="3600" size="3"> seconds (0 -> WiFi is always
-                        on)</td>
+                    <td><input type="number" id="numWifiOn" min="0" max="30" size="3"> minutes (0 -> always ON)
+                    </td>
                 </tr>
                 <tr>
                     <td>Delay after light out</td>

@@ -250,7 +250,7 @@ void loop()
         }
 
         // da li je vreme da se iskljuci WiFi tj. veb server
-        if (setts.wifiOn != 0 && ms - msLastServerAction > 1000 * setts.wifiOn)
+        if (setts.wifiOn != 0 && ms - msLastServerAction > 60 * 1000 * setts.wifiOn)
             RestartForWiFi(false);
 
         server.handleClient();
