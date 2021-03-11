@@ -13,6 +13,7 @@ private:
 
 public:
     int lightOn;            // koliko je sekundi svetlo upaljeno posle poslednjeg signala sa PIR-a
+    int longLightOn;        // koliko je minuta dugo svetlo upaljeno posle poslednjeg signala sa PIR-a
     int lightLevel = 100;   // jacina LED svetla (0-100)
     int backlightLimitLow;  // granica pozadinskog osvetljenja iznad koje se svetlo ne pali
     int backlightLimitHigh; // granica pozadinskog osvetljenja ispod koje se svetlo ne gasi
@@ -24,7 +25,8 @@ public:
     const int MAX_LEVEL = 100; // maksimalni nivo osvetljenja
 
     int photoInterval; // Cekanje (u sec) izmedju 2 slikanja.
-    void setLightOn(int x) { lightOn = constrain(x, 1, 3600); }
+    void setLightOn(int x) { lightOn = constrain(x, 1, 300); }
+    void setLongLightOn(int x) { longLightOn = constrain(x, 1, 30); }
     void setLightLevel(int x) { lightLevel = constrain(x, 1, MAX_LEVEL); }
     void setBacklightLimitLow(int x) { backlightLimitLow = constrain(x, 1, MAX_LEVEL); }
     void setBacklightLimitHigh(int x) { backlightLimitHigh = constrain(x, 1, MAX_LEVEL); }

@@ -55,6 +55,7 @@ function ParseConfig(resp) {
 
 function DisplayConfig() {
     numLightOn.value = ConfValue('lightOn');
+    numLongLightOn.value = ConfValue('longLightOn');
     numLightLevel.value = ConfValue('lightLevel');
     numBacklightLimitLow.value = ConfValue('backlightLimitLow');
     numBacklightLimitHigh.value = ConfValue('backlightLimitHigh');
@@ -75,6 +76,7 @@ function SaveConfig() {
     const sepParams = '&';
     const confData
         = 'lightOn' + sepProps + numLightOn.value + sepParams
+        + 'longLightOn' + sepProps + numLongLightOn.value + sepParams
         + 'lightLevel' + sepProps + numLightLevel.value + sepParams
         + 'backlightLimitLow' + sepProps + numBacklightLimitLow.value + sepParams
         + 'backlightLimitHigh' + sepProps + numBacklightLimitHigh.value + sepParams
