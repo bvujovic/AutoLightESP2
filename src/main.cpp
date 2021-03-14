@@ -28,18 +28,23 @@ const int pinLed = 2;    // ugradjena LED dioda na ESPu - upaljena kada radi wif
 
 const int eepromPos = 88; // pozicija u EEPROMu na kojoj ce se cuvati podatak da li se wifi pali ili ne pri sledecm resetu
 
+const ulong itvModWait = 1000 * 60 * 5; // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
+// posle toga se aparat vraca na standardna podesavanja - kratko (npr 45sec) svetlo, podrazumevanog intenziteta.
+
 // variables
 bool isLightOn;             // da li je svetlo upaljeno ili ne
 int backlightLimit;         // granica pozadinskog osvetljenja ...
 bool isWiFiOn = false;      // da li wifi i veb server treba da budu ukljuceni
-long msBtnStart = -1;       // millis za pocetak pritiska na taster
-long msLastServerAction;    // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
+ulong msBtnStart = 0;       // millis za pocetak pritiska na taster
+ulong msLastServerAction;   // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
 ulong msLastShortClick = 0; // vreme poslednjeg kratkog klika
-long msLastPir = -1;        // poslednji put kada je signal sa PIRa bio HIGH
-long msStartPir = -1;       // pocetak HIGH PIR signala pri dovoljno jakom pozadinskom osvetljenju
-int consecPirs = 0;         // broj uzastopnih pinPIR HIGH vrednosti
+ulong msModLastSet = 0;     // vreme pokretanja moda (dugo i/ili slabo svetlo) ili njegovog poslednjeg koriscenja
+ulong msLastPir = 0;        // poslednji put kada je signal sa PIRa bio HIGH
+ulong msStartPir = 0;       // pocetak HIGH PIR signala pri dovoljno jakom pozadinskom osvetljenju
+uint consecPirs = 0;        // broj uzastopnih pinPIR HIGH vrednosti
 int cntShortClicks = 0;     // broj kratkih klikova u seriji
 bool isLongLight = false;   // da li se je trajanje svetla dugo (npr 5min) ili kratko/obicno (npr 45sec)
+bool isLight2 = false;      // da li se koristi drugo svetlo (drugi intenzitet, slabije npr)
 int i = 0;
 
 #include "Setts.h"
@@ -69,10 +74,15 @@ void AddStatusString(int _id, int _ldr, int _secFromPIR, bool _isLightOn)
 
 void SetLight(bool isOn)
 {
-    int lvl = map(setts.lightLevel, 0, setts.MAX_LEVEL, 0, PWMRANGE);
+    int lvl = isLight2 ? setts.lightLevel2 : setts.lightLevel;
+    lvl = map(lvl, 0, setts.MAX_LEVEL, 0, PWMRANGE);
     analogWrite(pinLight, isOn ? lvl : 0);
     if (isLightOn && !isOn) // svetlo se upravo gasi
+    {
         delay(setts.lightOutDelay);
+        if (isLongLight || isLight2)
+            msModLastSet = millis();
+    }
     isLightOn = isOn;
 }
 
@@ -103,12 +113,6 @@ void HandleSaveConfig()
     if (setts.wifiOn == 0 && !isWiFiOn)
         RestartForWiFi(true);
 }
-
-//B
-// void HandleTest()
-// {
-//     server.send(200, "text/html", "<h1>Test: You are connected</h1>");
-// }
 
 void HandleGetStatus()
 {
@@ -176,7 +180,6 @@ void setup()
         SetupIPAddress(40);
 
         server.on("/inc/wifi_light_128.png", []() { HandleDataFile(server, "/inc/wifi_light_128.png", "image/png"); });
-        //B server.on("/test", HandleTest);
         server.on("/test", []() { server.send(200, "text/html", "<h1>Test: You are connected</h1>"); });
         server.on("/", []() { HandleDataFile(server, "/index.html", "text/html"); });
         server.on("/inc/index.js", []() { HandleDataFile(server, "/inc/index.js", "text/javascript"); });
@@ -211,17 +214,14 @@ void loop()
     else
         server.handleClient();
 
-    long ms = millis();
+    ulong ms = millis();
     int valPir = digitalRead(pinPIR);
     consecPirs = valPir ? consecPirs + 1 : 0;
 
     if (consecPirs >= setts.minHighPIRs) // HIGH na PIR-u se prihvata samo ako je ta vrednost x puta zaredom ocitana
         msLastPir = ms;
-    if (!valPir && msStartPir != -1)
-    {
-        msStartPir = -1;
-        msLastPir = -1;
-    }
+    if (!valPir && msStartPir != 0)
+        msStartPir = msLastPir = 0;
 
     int valPhotoRes = map(analogRead(pinPhotoRes), 0, 1023, 0, setts.MAX_LEVEL);
     valPhotoRes = ldrs.Add(valPhotoRes);
@@ -235,10 +235,8 @@ void loop()
     }
     else // prostorija nije dovoljno osvetljena
     {
-        bool x = !isLongLight && ms - msLastPir < 1000 * setts.lightOn
-            || isLongLight && ms - msLastPir < 60 * 1000 * setts.longLightOn;
-        //B if (msLastPir != -1 && ms - msLastPir < 1000 * setts.lightOn && msStartPir == -1)
-        if (msLastPir != -1 && msStartPir == -1 && x)
+        bool x = (!isLongLight && ms - msLastPir < 1000 * setts.lightOn) || (isLongLight && ms - msLastPir < 60 * 1000 * setts.longLightOn);
+        if (msLastPir != 0 && msStartPir == 0 && x)
         {
             backlightLimit = setts.backlightLimitHigh;
             SetLight(true);
@@ -249,12 +247,12 @@ void loop()
 
     if (valPhotoRes > 0.95 * setts.MAX_LEVEL) // ako je pritisnut taster nabudzen sa LDRom
     {
-        if (msBtnStart == -1)
-            msBtnStart = ms;                          // pamti se pocetak pritiska na taster
+        if (msBtnStart == 0)
+            msBtnStart = ms; // pamti se pocetak pritiska na taster
         else if (ms - msBtnStart > 1000 && !isWiFiOn) // ako se taster drzi vise od sekunde
             RestartForWiFi(true);
     }
-    else if (msBtnStart != -1) // ako je upravo otpusten taster nabudzen sa LDRom
+    else if (msBtnStart != 0) // ako je upravo otpusten taster nabudzen sa LDRom
     {
         if (ms - msBtnStart < 1000) // ako je kratak klik
         {
@@ -262,19 +260,27 @@ void loop()
             msLastShortClick = ms;
             //T EasyFS::addf(String(ms) + ": " + String(ms - msBtnStart));
         }
-        msBtnStart = -1;
+        msBtnStart = 0;
     }
-    else if (msLastShortClick != 0) // ako taster ostaje otpusten, a bilo je skorasnjih klikova
+    // ako taster ostaje otpusten, a bilo je skorasnjih klikova
+    else if (msLastShortClick != 0 && ms - msLastShortClick > 1000)
     {
-        if (ms - msLastShortClick > 1000)
-        {
-            //T EasyFS::addf(String(cntShortClicks));
-            if (cntShortClicks == 1)
-                isLongLight = false;
-            if (cntShortClicks == 2)
-                isLongLight = true;
-            msLastShortClick = cntShortClicks = 0;
-        }
+        //T EasyFS::addf(String(cntShortClicks));
+        if (cntShortClicks == 1)
+            isLongLight = isLight2 = false;
+        if (cntShortClicks == 2)
+            isLongLight = true;
+        if (cntShortClicks == 3)
+            isLight2 = true;
+        if (isLongLight || isLight2)
+            msModLastSet = ms;
+        msLastShortClick = cntShortClicks = 0;
+    }
+
+    if (msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > itvModWait)
+    {
+        isLongLight = isLight2 = false;
+        msModLastSet = 0;
     }
 
     digitalWrite(pinLed, !isWiFiOn);

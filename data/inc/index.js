@@ -57,6 +57,7 @@ function DisplayConfig() {
     numLightOn.value = ConfValue('lightOn');
     numLongLightOn.value = ConfValue('longLightOn');
     numLightLevel.value = ConfValue('lightLevel');
+    numLightLevel2.value = ConfValue('lightLevel2');
     numBacklightLimitLow.value = ConfValue('backlightLimitLow');
     numBacklightLimitHigh.value = ConfValue('backlightLimitHigh');
     numWifiOn.value = ConfValue('wifiOn');
@@ -78,6 +79,7 @@ function SaveConfig() {
         = 'lightOn' + sepProps + numLightOn.value + sepParams
         + 'longLightOn' + sepProps + numLongLightOn.value + sepParams
         + 'lightLevel' + sepProps + numLightLevel.value + sepParams
+        + 'lightLevel2' + sepProps + numLightLevel2.value + sepParams
         + 'backlightLimitLow' + sepProps + numBacklightLimitLow.value + sepParams
         + 'backlightLimitHigh' + sepProps + numBacklightLimitHigh.value + sepParams
         + 'wifiOn' + sepProps + numWifiOn.value + sepParams

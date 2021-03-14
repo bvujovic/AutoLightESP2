@@ -8,6 +8,7 @@ bool Setts::loadSetts()
         lightOn = ei->getInt("lightOn");
         longLightOn = ei->getInt("longLightOn");
         lightLevel = ei->getInt("lightLevel");
+        lightLevel2 = ei->getInt("lightLevel2");
         backlightLimitLow = ei->getInt("backlightLimitLow");
         backlightLimitHigh = ei->getInt("backlightLimitHigh");
         wifiOn = ei->getInt("wifiOn");
@@ -29,6 +30,7 @@ void Setts::saveSetts(ESP8266WebServer &server)
         setLightOn(server.arg("lightOn").toInt());
         setLongLightOn(server.arg("longLightOn").toInt());
         setLightLevel(server.arg("lightLevel").toInt());
+        setLightLevel2(server.arg("lightLevel2").toInt());
         setBacklightLimitLow(server.arg("backlightLimitLow").toInt());
         setBacklightLimitHigh(server.arg("backlightLimitHigh").toInt());
         setWifiOn(server.arg("wifiOn").toInt());
@@ -39,6 +41,7 @@ void Setts::saveSetts(ESP8266WebServer &server)
         ei->setInt("lightOn", lightOn);
         ei->setInt("longLightOn", longLightOn);
         ei->setInt("lightLevel", lightLevel);
+        ei->setInt("lightLevel2", lightLevel2);
         ei->setInt("backlightLimitLow", backlightLimitLow);
         ei->setInt("backlightLimitHigh", backlightLimitHigh);
         ei->setInt("wifiOn", wifiOn);
