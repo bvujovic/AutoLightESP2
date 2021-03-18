@@ -20,15 +20,16 @@ EasyINI ei("/config.ini");
 
 // pins
 // INPUT
-const int pinPhotoRes = A0; // pin za LDR i taster za WiFi
-const int pinPIR = D0;
+const byte pinPhotoRes = A0; // pin za LDR i taster za WiFi
+const byte pinPIR = D0;
 // OUTPUT
-const int pinLight = D8; // LED svetlo za osvetljavanje prostorije
-const int pinLed = 2;    // ugradjena LED dioda na ESPu - upaljena kada radi wifi
+const byte pinLight = D8; // LED svetlo za osvetljavanje prostorije
+const byte pinLed = 2;    // ugradjena LED dioda na ESPu - upaljena kada radi wifi
 
 const int eepromPos = 88; // pozicija u EEPROMu na kojoj ce se cuvati podatak da li se wifi pali ili ne pri sledecm resetu
 
-const ulong itvModWait = 1000 * 60 * 5; // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
+const ulong itvOtaTime = 60000;         // vreme (u ms) koje ce aparat provesti u cekanju da pocne OTA update
+const ulong itvModWait = 1000 * 60 * 2; // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
 // posle toga se aparat vraca na standardna podesavanja - kratko (npr 45sec) svetlo, podrazumevanog intenziteta.
 
 // variables
@@ -46,6 +47,9 @@ int cntShortClicks = 0;     // broj kratkih klikova u seriji
 bool isLongLight = false;   // da li se je trajanje svetla dugo (npr 5min) ili kratko/obicno (npr 45sec)
 bool isLight2 = false;      // da li se koristi drugo svetlo (drugi intenzitet, slabije npr)
 int i = 0;
+
+void newMsg(const String &s) { EasyFS::addf(String(millis() / 1000) + " - " + s); }
+void newMsg(const String &s, int x) { EasyFS::addf(String(millis()) + " - " + s + "=" + String(x)); }
 
 #include "Setts.h"
 Setts setts;
@@ -72,6 +76,7 @@ void AddStatusString(int _id, int _ldr, int _secFromPIR, bool _isLightOn)
     statuses.add(s);
 }
 
+// Postavljanje svetla na ON(true) ili OFF(false)
 void SetLight(bool isOn)
 {
     int lvl = isLight2 ? setts.lightLevel2 : setts.lightLevel;
@@ -80,10 +85,15 @@ void SetLight(bool isOn)
     if (isLightOn && !isOn) // svetlo se upravo gasi
     {
         delay(setts.lightOutDelay);
+        //T newMsg("lights out, ll=" + String(isLongLight) + ", l2=" + String(isLight2));
         if (isLongLight || isLight2)
             msModLastSet = millis();
     }
-    isLightOn = isOn;
+    if (isLightOn != isOn)
+    {
+        isLightOn = isOn;
+        newMsg("on/off", isOn);
+    }
 }
 
 // Pamcenje informacije o tome da li ce WiFi biti ukljucen ili ne posle sledeceg paljenja/budjenja aparata i reset
@@ -110,8 +120,10 @@ void HandleSaveConfig()
     backlightLimit = setts.backlightLimitLow;
     SendEmptyText(server);
 
-    if (setts.wifiOn == 0 && !isWiFiOn)
-        RestartForWiFi(true);
+    //B if (setts.wifiOn == 0 && !isWiFiOn)
+    //B
+    // if (setts.wifiOn == 0)
+    //     RestartForWiFi(true);
 }
 
 void HandleGetStatus()
@@ -139,16 +151,20 @@ void HandleMsgs()
     server.send(200, "text/plain", EasyFS::readf());
 }
 
+void HandleOTA()
+{
+    server.send(200, "text/plain", "ESP is waiting for OTA updates...");
+    msLastServerAction = millis();
+    isOtaOn = true;
+    ArduinoOTA.begin();
+}
+
 void HandleNotFound()
 {
     String s = "Page Not Found\n\n";
-    s += "URI: ";
-    s += server.uri();
-    s += "\nMethod: ";
-    s += (server.method() == HTTP_GET) ? "GET" : "POST";
-    s += "\nArguments: ";
-    s += server.args();
-    s += "\n";
+    s += "URI: " + server.uri();
+    s += "\nMethod: " + String((server.method() == HTTP_GET) ? "GET" : "POST");
+    s += "\nArguments:\n";
     for (int i = 0; i < server.args(); i++)
         s += " " + server.argName(i) + ": " + server.arg(i) + "\n";
     server.send(404, "text/plain", s);
@@ -167,6 +183,7 @@ void setup()
     LittleFS.begin();
     ReadConfigFile();
     EasyFS::setFileName("/msgs.log");
+    EasyFS::clearf();
 
     EEPROM.begin(512);
     isWiFiOn = setts.wifiOn == 0 ? true : EEPROM.read(eepromPos);
@@ -191,7 +208,7 @@ void setup()
         server.on("/get_status", HandleGetStatus);
         server.on("/get_ldr_vals", HandleLdrVals);
         server.on("/msgs", HandleMsgs);
-        server.on("/otaUpdate", []() { server.send(200, "text/plain", "ESP is waiting for OTA updates..."); isOtaOn = true; ArduinoOTA.begin(); });
+        server.on("/otaUpdate", HandleOTA);
         server.onNotFound(HandleNotFound);
         server.begin();
         msLastStatus = msLastServerAction = millis();
@@ -208,13 +225,16 @@ void setup()
 void loop()
 {
     delay(setts.msMainDelay);
+    ulong ms = millis();
 
     if (isOtaOn)
+    {
+        if (ms > msLastServerAction + itvOtaTime)
+            isOtaOn = false;
         ArduinoOTA.handle();
-    else
-        server.handleClient();
+        return;
+    }
 
-    ulong ms = millis();
     int valPir = digitalRead(pinPIR);
     consecPirs = valPir ? consecPirs + 1 : 0;
 
@@ -244,11 +264,14 @@ void loop()
         else
             SetLight(false);
     }
-
+    ms = millis();
     if (valPhotoRes > 0.95 * setts.MAX_LEVEL) // ako je pritisnut taster nabudzen sa LDRom
     {
         if (msBtnStart == 0)
+        {
+            //T newMsg("msBtnStart");
             msBtnStart = ms; // pamti se pocetak pritiska na taster
+        }
         else if (ms - msBtnStart > 1000 && !isWiFiOn) // ako se taster drzi vise od sekunde
             RestartForWiFi(true);
     }
@@ -258,27 +281,27 @@ void loop()
         {
             cntShortClicks++;
             msLastShortClick = ms;
-            //T EasyFS::addf(String(ms) + ": " + String(ms - msBtnStart));
+            //T newMsg("ms-msBtnStart=" + String(ms - msBtnStart));
         }
         msBtnStart = 0;
     }
     // ako taster ostaje otpusten, a bilo je skorasnjih klikova
     else if (msLastShortClick != 0 && ms - msLastShortClick > 1000)
     {
-        //T EasyFS::addf(String(cntShortClicks));
+        //T newMsg("cntShortClicks=" + String(cntShortClicks));
         if (cntShortClicks == 1)
             isLongLight = isLight2 = false;
         if (cntShortClicks == 2)
             isLongLight = true;
         if (cntShortClicks == 3)
             isLight2 = true;
-        if (isLongLight || isLight2)
-            msModLastSet = ms;
+        msModLastSet = (isLongLight || isLight2) ? ms : 0;
         msLastShortClick = cntShortClicks = 0;
     }
 
-    if (msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > itvModWait)
+    if (!isLightOn && msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > itvModWait)
     {
+        //T newMsg("kraj pamcenja");
         isLongLight = isLight2 = false;
         msModLastSet = 0;
     }
