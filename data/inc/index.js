@@ -61,7 +61,7 @@ function DisplayConfig() {
     numBacklightLimitLow.value = ConfValue('backlightLimitLow');
     numBacklightLimitHigh.value = ConfValue('backlightLimitHigh');
     numWifiOn.value = ConfValue('wifiOn');
-    numLightOutDelay.value = ConfValue('lightOutDelay');
+    //B numLightOutDelay.value = ConfValue('lightOutDelay');
     numMinHighPIRs.value = ConfValue('minHighPIRs');
     numMsMainDelay.value = ConfValue('msMainDelay');
 }
@@ -83,7 +83,7 @@ function SaveConfig() {
         + 'backlightLimitLow' + sepProps + numBacklightLimitLow.value + sepParams
         + 'backlightLimitHigh' + sepProps + numBacklightLimitHigh.value + sepParams
         + 'wifiOn' + sepProps + numWifiOn.value + sepParams
-        + 'lightOutDelay' + sepProps + numLightOutDelay.value + sepParams
+        //B + 'lightOutDelay' + sepProps + numLightOutDelay.value + sepParams
         + 'minHighPIRs' + sepProps + numMinHighPIRs.value + sepParams
         + 'msMainDelay' + sepProps + numMsMainDelay.value;
 

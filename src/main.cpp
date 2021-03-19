@@ -28,27 +28,29 @@ const byte pinLed = 2;    // ugradjena LED dioda na ESPu - upaljena kada radi wi
 
 const int eepromPos = 88; // pozicija u EEPROMu na kojoj ce se cuvati podatak da li se wifi pali ili ne pri sledecm resetu
 
-const ulong itvOtaTime = 60000;         // vreme (u ms) koje ce aparat provesti u cekanju da pocne OTA update
-const ulong itvModWait = 1000 * 60 * 2; // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
+const ulong itvOtaTime = 1 * 60 * 1000; // vreme (u ms) koje ce aparat provesti u cekanju da pocne OTA update
+const ulong itvModWait = 2 * 60 * 1000; // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
 // posle toga se aparat vraca na standardna podesavanja - kratko (npr 45sec) svetlo, podrazumevanog intenziteta.
 
 // variables
-bool isLightOn;             // da li je svetlo upaljeno ili ne
-int backlightLimit;         // granica pozadinskog osvetljenja ...
-bool isWiFiOn = false;      // da li wifi i veb server treba da budu ukljuceni
-ulong msBtnStart = 0;       // millis za pocetak pritiska na taster
-ulong msLastServerAction;   // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
-ulong msLastShortClick = 0; // vreme poslednjeg kratkog klika
-ulong msModLastSet = 0;     // vreme pokretanja moda (dugo i/ili slabo svetlo) ili njegovog poslednjeg koriscenja
-ulong msLastPir = 0;        // poslednji put kada je signal sa PIRa bio HIGH
-ulong msStartPir = 0;       // pocetak HIGH PIR signala pri dovoljno jakom pozadinskom osvetljenju
-uint consecPirs = 0;        // broj uzastopnih pinPIR HIGH vrednosti
-int cntShortClicks = 0;     // broj kratkih klikova u seriji
-bool isLongLight = false;   // da li se je trajanje svetla dugo (npr 5min) ili kratko/obicno (npr 45sec)
-bool isLight2 = false;      // da li se koristi drugo svetlo (drugi intenzitet, slabije npr)
+bool isLightOn;              // da li je svetlo upaljeno ili ne
+int backlightLimit;          // granica pozadinskog osvetljenja ...
+bool isWiFiOn = false;       // da li wifi i veb server treba da budu ukljuceni
+ulong msBtnStart = 0;        // millis za pocetak pritiska na taster
+ulong msLastServerAction;    // millis za poslednju akciju sa veb serverom (pokretanje ili ucitavanje neke stranice)
+ulong msLastShortClick = 0;  // vreme poslednjeg kratkog klika
+ulong msModLastSet = 0;      // vreme pokretanja moda (dugo i/ili slabo svetlo) ili njegovog poslednjeg koriscenja
+ulong msLastPir = 0;         // poslednji put kada je signal sa PIRa bio HIGH
+ulong msStartPir = 0;        // pocetak HIGH PIR signala pri dovoljno jakom pozadinskom osvetljenju
+ulong msLastLightChange = 0; // poslednja promena svetla: on->off ili off->on
+ulong cntFastOnOff = 0;      // broj uzastopnih brzih promena svetla
+uint consecPirs = 0;         // broj uzastopnih pinPIR HIGH vrednosti
+int cntShortClicks = 0;      // broj kratkih klikova u seriji
+bool isLongLight = false;    // da li se je trajanje svetla dugo (npr 5min) ili kratko/obicno (npr 45sec)
+bool isLight2 = false;       // da li se koristi drugo svetlo (drugi intenzitet, slabije npr)
 int i = 0;
 
-void newMsg(const String &s) { EasyFS::addf(String(millis() / 1000) + " - " + s); }
+void newMsg(const String &s) { EasyFS::addf(String(millis()) + " - " + s); }
 void newMsg(const String &s, int x) { EasyFS::addf(String(millis()) + " - " + s + "=" + String(x)); }
 
 #include "Setts.h"
@@ -82,17 +84,32 @@ void SetLight(bool isOn)
     int lvl = isLight2 ? setts.lightLevel2 : setts.lightLevel;
     lvl = map(lvl, 0, setts.MAX_LEVEL, 0, PWMRANGE);
     analogWrite(pinLight, isOn ? lvl : 0);
+    ulong ms = millis();
     if (isLightOn && !isOn) // svetlo se upravo gasi
-    {
-        delay(setts.lightOutDelay);
-        //T newMsg("lights out, ll=" + String(isLongLight) + ", l2=" + String(isLight2));
         if (isLongLight || isLight2)
-            msModLastSet = millis();
-    }
+            msModLastSet = ms;
+
     if (isLightOn != isOn)
     {
         isLightOn = isOn;
-        newMsg("on/off", isOn);
+        // kôd koji brani brzo pali-gasenje svetla zbog preblizu postavljenih granica setts.backlight...
+        if (ms < msLastLightChange + 1000)
+        {
+            cntFastOnOff++;
+            if (cntFastOnOff >= 3) // setts.backlight... granice se razmicu ako se dese 3 brza ON<->OFF prelaza
+            {
+                const ulong step = 10;
+                if (setts.backlightLimitHigh + step < setts.MAX_LEVEL * 0.9)
+                    setts.backlightLimitHigh += step;
+                else if (setts.backlightLimitLow - step >= 0)
+                    setts.backlightLimitLow -= step;
+                cntFastOnOff = 0;
+                setts.saveToFile();
+            }
+        }
+        else
+            cntFastOnOff = 0;
+        msLastLightChange = ms;
     }
 }
 
@@ -108,7 +125,7 @@ void RestartForWiFi(bool nextWiFiOn)
 void ReadConfigFile()
 {
     msLastServerAction = millis();
-    setts.loadSetts();
+    setts.load();
     backlightLimit = setts.backlightLimitLow;
 }
 
@@ -116,14 +133,10 @@ void HandleSaveConfig()
 {
     // lightOn=6&backlightLimitLow=200&backlightLimitHigh=400&wifiOn=2200...
     msLastServerAction = millis();
-    setts.saveSetts(server);
+    setts.saveToMem(server);
+    setts.saveToFile();
     backlightLimit = setts.backlightLimitLow;
     SendEmptyText(server);
-
-    //B if (setts.wifiOn == 0 && !isWiFiOn)
-    //B
-    // if (setts.wifiOn == 0)
-    //     RestartForWiFi(true);
 }
 
 void HandleGetStatus()
@@ -135,7 +148,7 @@ void HandleGetStatus()
         server.send(200, "text/x-csv", last);
     }
     else
-        server.send(204, "text/x-csv", "");
+        SendEmptyText(server);
 }
 
 void HandleLdrVals()
