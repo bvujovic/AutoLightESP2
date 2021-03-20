@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <EEPROM.h>
 #include <LinkedList.h>
 
 #include <WiFiServerBasics.h>
@@ -15,8 +14,6 @@ LdrVals ldrs;
 EasyINI ei("/config.ini");
 
 #include "EasyFS.h"
-
-#define DEBUG true
 
 // pins
 // INPUT
@@ -84,10 +81,10 @@ void SetLight(bool isOn)
     int lvl = isLight2 ? setts.lightLevel2 : setts.lightLevel;
     lvl = map(lvl, 0, setts.MAX_LEVEL, 0, PWMRANGE);
     analogWrite(pinLight, isOn ? lvl : 0);
+    backlightLimit = isOn ? setts.backlightLimitHigh : setts.backlightLimitLow;
     ulong ms = millis();
-    if (isLightOn && !isOn) // svetlo se upravo gasi
-        if (isLongLight || isLight2)
-            msModLastSet = ms;
+    if (isLightOn && !isOn && (isLongLight || isLight2)) // svetlo se upravo gasi
+        msModLastSet = ms;
 
     if (isLightOn != isOn)
     {
@@ -96,7 +93,7 @@ void SetLight(bool isOn)
         if (ms < msLastLightChange + 1000)
         {
             cntFastOnOff++;
-            if (cntFastOnOff >= 3) // setts.backlight... granice se razmicu ako se dese 3 brza ON<->OFF prelaza
+            if (cntFastOnOff >= 2) // setts.backlight... granice se razmicu ako se dese 2 brza ON<->OFF prelaza
             {
                 const ulong step = 10;
                 if (setts.backlightLimitHigh + step < setts.MAX_LEVEL * 0.9)
@@ -113,13 +110,28 @@ void SetLight(bool isOn)
     }
 }
 
-// Pamcenje informacije o tome da li ce WiFi biti ukljucen ili ne posle sledeceg paljenja/budjenja aparata i reset
-void RestartForWiFi(bool nextWiFiOn)
+void WebServerStart();
+
+// Konektovanje na WiFi i postavljanje IP adrese.
+void WiFiOn()
 {
-    EEPROM.write(eepromPos, nextWiFiOn);
-    EEPROM.commit();
-    delay(10);
-    ESP.restart();
+    SetLight(true);
+    WiFi.mode(WIFI_STA);
+    ConnectToWiFi();
+    SetupIPAddress(40);
+    WebServerStart();
+    isWiFiOn = true;
+}
+
+// Diskonektovanje sa WiFi-a.
+void WiFiOff()
+{
+    isWiFiOn = false;
+    server.stop();
+    WiFi.disconnect();
+    WiFi.mode(WIFI_OFF);
+    WiFi.forceSleepBegin();
+    delay(100);
 }
 
 void ReadConfigFile()
@@ -183,6 +195,27 @@ void HandleNotFound()
     server.send(404, "text/plain", s);
 }
 
+// Konfiguracija veb servera i njegovo pokretanje.
+void WebServerStart()
+{
+    server.on("/inc/wifi_light_128.png", []() { HandleDataFile(server, "/inc/wifi_light_128.png", "image/png"); });
+    server.on("/test", []() { server.send(200, "text/html", "<h1>Test: You are connected</h1>"); });
+    server.on("/", []() { HandleDataFile(server, "/index.html", "text/html"); });
+    server.on("/inc/index.js", []() { HandleDataFile(server, "/inc/index.js", "text/javascript"); });
+    server.on("/inc/style.css", []() { HandleDataFile(server, "/inc/style.css", "text/css"); });
+    server.on(ei.getFileName(), []() { HandleDataFile(server, ei.getFileName(), "text/x-csv"); });
+    server.on("/save_config", HandleSaveConfig);
+    server.on("/current_data.html", []() { HandleDataFile(server, "/current_data.html", "text/html"); });
+    server.on("/inc/current_data.js", []() { HandleDataFile(server, "/inc/current_data.js", "text/javascript"); });
+    server.on("/get_status", HandleGetStatus);
+    server.on("/get_ldr_vals", HandleLdrVals);
+    server.on("/msgs", HandleMsgs);
+    server.on("/otaUpdate", HandleOTA);
+    server.onNotFound(HandleNotFound);
+    server.begin();
+    msLastStatus = msLastServerAction = millis();
+}
+
 void setup()
 {
     pinMode(pinPIR, INPUT);
@@ -190,49 +223,13 @@ void setup()
     pinMode(pinLed, OUTPUT);
     digitalWrite(pinLed, true);
     pinMode(pinLight, OUTPUT);
-    SetLight(false);
 
     Serial.begin(115200);
     LittleFS.begin();
     ReadConfigFile();
-    EasyFS::setFileName("/msgs.log");
-    EasyFS::clearf();
+    EasyFS::setFileName("/msgs.log", true);
 
-    EEPROM.begin(512);
-    isWiFiOn = setts.wifiOn == 0 ? true : EEPROM.read(eepromPos);
-
-    SetLight(isWiFiOn); // ako se pali WiFi, svetlo je upaljeno
-    backlightLimit = isWiFiOn ? setts.backlightLimitHigh : setts.backlightLimitLow;
-
-    if (isWiFiOn)
-    {
-        ConnectToWiFi();
-        SetupIPAddress(40);
-
-        server.on("/inc/wifi_light_128.png", []() { HandleDataFile(server, "/inc/wifi_light_128.png", "image/png"); });
-        server.on("/test", []() { server.send(200, "text/html", "<h1>Test: You are connected</h1>"); });
-        server.on("/", []() { HandleDataFile(server, "/index.html", "text/html"); });
-        server.on("/inc/index.js", []() { HandleDataFile(server, "/inc/index.js", "text/javascript"); });
-        server.on("/inc/style.css", []() { HandleDataFile(server, "/inc/style.css", "text/css"); });
-        server.on(ei.getFileName(), []() { HandleDataFile(server, ei.getFileName(), "text/x-csv"); });
-        server.on("/save_config", HandleSaveConfig);
-        server.on("/current_data.html", []() { HandleDataFile(server, "/current_data.html", "text/html"); });
-        server.on("/inc/current_data.js", []() { HandleDataFile(server, "/inc/current_data.js", "text/javascript"); });
-        server.on("/get_status", HandleGetStatus);
-        server.on("/get_ldr_vals", HandleLdrVals);
-        server.on("/msgs", HandleMsgs);
-        server.on("/otaUpdate", HandleOTA);
-        server.onNotFound(HandleNotFound);
-        server.begin();
-        msLastStatus = msLastServerAction = millis();
-        if (DEBUG)
-            Serial.println("HTTP server started");
-    }
-    else
-    {
-        WiFi.forceSleepBegin();
-        delay(10); // give RF section time to shutdown
-    }
+    WiFiOn();
 }
 
 void loop()
@@ -264,16 +261,12 @@ void loop()
         if (consecPirs == setts.minHighPIRs) // pokret zapocet kada je prostorija dovoljno osvetljena
             msStartPir = ms;
         SetLight(false);
-        backlightLimit = setts.backlightLimitLow;
     }
     else // prostorija nije dovoljno osvetljena
     {
-        bool x = (!isLongLight && ms - msLastPir < 1000 * setts.lightOn) || (isLongLight && ms - msLastPir < 60 * 1000 * setts.longLightOn);
+        bool x = (!isLongLight && ms < msLastPir + 1000 * setts.lightOn) || (isLongLight && ms < msLastPir + 60 * 1000 * setts.longLightOn);
         if (msLastPir != 0 && msStartPir == 0 && x)
-        {
-            backlightLimit = setts.backlightLimitHigh;
             SetLight(true);
-        }
         else
             SetLight(false);
     }
@@ -281,12 +274,9 @@ void loop()
     if (valPhotoRes > 0.95 * setts.MAX_LEVEL) // ako je pritisnut taster nabudzen sa LDRom
     {
         if (msBtnStart == 0)
-        {
-            //T newMsg("msBtnStart");
-            msBtnStart = ms; // pamti se pocetak pritiska na taster
-        }
-        else if (ms - msBtnStart > 1000 && !isWiFiOn) // ako se taster drzi vise od sekunde
-            RestartForWiFi(true);
+            msBtnStart = ms;                          // pamti se pocetak pritiska na taster
+        else if (ms > msBtnStart + 1000 && !isWiFiOn) // ako se taster drzi vise od sekunde
+            WiFiOn();
     }
     else if (msBtnStart != 0) // ako je upravo otpusten taster nabudzen sa LDRom
     {
@@ -294,14 +284,12 @@ void loop()
         {
             cntShortClicks++;
             msLastShortClick = ms;
-            //T newMsg("ms-msBtnStart=" + String(ms - msBtnStart));
         }
         msBtnStart = 0;
     }
     // ako taster ostaje otpusten, a bilo je skorasnjih klikova
-    else if (msLastShortClick != 0 && ms - msLastShortClick > 1000)
+    else if (msLastShortClick != 0 && ms > msLastShortClick + 1000)
     {
-        //T newMsg("cntShortClicks=" + String(cntShortClicks));
         if (cntShortClicks == 1)
             isLongLight = isLight2 = false;
         if (cntShortClicks == 2)
@@ -314,7 +302,6 @@ void loop()
 
     if (!isLightOn && msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > itvModWait)
     {
-        //T newMsg("kraj pamcenja");
         isLongLight = isLight2 = false;
         msModLastSet = 0;
     }
@@ -329,8 +316,8 @@ void loop()
         }
 
         // da li je vreme da se iskljuci WiFi tj. veb server
-        if (setts.wifiOn != 0 && ms - msLastServerAction > 60 * 1000 * setts.wifiOn)
-            RestartForWiFi(false);
+        if (setts.wifiOn != 0 && ms > msLastServerAction + setts.wifiOn * 60 * 1000)
+            WiFiOff();
 
         server.handleClient();
     }

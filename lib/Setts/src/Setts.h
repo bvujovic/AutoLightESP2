@@ -35,7 +35,7 @@ public:
     void setWifiOn(uint x) { wifiOn = constrain(x, 0, 30); }
     //B void setLightOutDelay(uint x) { lightOutDelay = constrain(x, 0, 2000); }
     void setMinHighPIRs(uint x) { minHighPIRs = constrain(x, 1, 100); }
-    void setMsMainDelay(uint x) { msMainDelay = constrain(x, 5, 500); }
+    void setMsMainDelay(uint x) { msMainDelay = constrain(x, 1, 100); }
 
     const char *getFileName() { return fileName; }
 
