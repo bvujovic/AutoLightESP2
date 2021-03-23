@@ -55,13 +55,13 @@ function ParseConfig(resp) {
 
 function DisplayConfig() {
     numLightOn.value = ConfValue('lightOn');
-    numLongLightOn.value = ConfValue('longLightOn');
     numLightLevel.value = ConfValue('lightLevel');
+    numRememberMode.value = ConfValue('rememberMode');
+    numLongLightOn.value = ConfValue('longLightOn');
     numLightLevel2.value = ConfValue('lightLevel2');
     numBacklightLimitLow.value = ConfValue('backlightLimitLow');
     numBacklightLimitHigh.value = ConfValue('backlightLimitHigh');
     numWifiOn.value = ConfValue('wifiOn');
-    //B numLightOutDelay.value = ConfValue('lightOutDelay');
     numMinHighPIRs.value = ConfValue('minHighPIRs');
     numMsMainDelay.value = ConfValue('msMainDelay');
 }
@@ -77,13 +77,13 @@ function SaveConfig() {
     const sepParams = '&';
     const confData
         = 'lightOn' + sepProps + numLightOn.value + sepParams
-        + 'longLightOn' + sepProps + numLongLightOn.value + sepParams
         + 'lightLevel' + sepProps + numLightLevel.value + sepParams
+        + 'rememberMode' + sepProps + numRememberMode.value + sepParams
+        + 'longLightOn' + sepProps + numLongLightOn.value + sepParams
         + 'lightLevel2' + sepProps + numLightLevel2.value + sepParams
         + 'backlightLimitLow' + sepProps + numBacklightLimitLow.value + sepParams
         + 'backlightLimitHigh' + sepProps + numBacklightLimitHigh.value + sepParams
         + 'wifiOn' + sepProps + numWifiOn.value + sepParams
-        //B + 'lightOutDelay' + sepProps + numLightOutDelay.value + sepParams
         + 'minHighPIRs' + sepProps + numMinHighPIRs.value + sepParams
         + 'msMainDelay' + sepProps + numMsMainDelay.value;
 
@@ -97,4 +97,9 @@ function SaveConfig() {
         };
         xhttp.open('GET', 'save_config?' + confData, true); xhttp.send();
     }
+}
+
+function OTA() {
+    var res = confirm('Please choose:\n  OK - HTTP Server\n  Cancel - local OTA update');
+    location.href = 'otaUpdate?type=' + (res ? 'web' : 'local');
 }

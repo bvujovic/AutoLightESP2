@@ -19,14 +19,17 @@
                 <tr>
                     <td>Light Level</td>
                     <td> <input type="range" id="numLightLevel" min="1" max="100"> </td>
-                    <!-- https://www.w3schools.com/howto/howto_js_rangeslider.asp -->
                 </tr>
                 <tr>
-                    <td>Light On</td>
+                    <td>Light ON</td>
                     <td><input type="number" id="numLightOn" min="1" max="300"> sec</td>
                 </tr>
                 <tr>
-                    <td>Long Light On</td>
+                    <td>Remember Mode</td>
+                    <td><input type="number" id="numRememberMode" min="1" max="30" size="3"> min</td>
+                </tr>
+                <tr>
+                    <td>Long Light ON</td>
                     <td><input type="number" id="numLongLightOn" min="1" max="30"> min</td>
                 </tr>
                 <tr>
@@ -42,21 +45,17 @@
                     <td><input type="range" id="numBacklightLimitHigh" min="1" max="100"></td>
                 </tr>
                 <tr>
-                    <td>WiFi On</td>
-                    <td><input type="number" id="numWifiOn" min="0" max="30" size="3"> min (0 → always ON)
+                    <td>WiFi ON</td>
+                    <td><input type="number" id="numWifiOn" min="0" max="30" size="3"> min *
                     </td>
                 </tr>
-                <!-- <tr>
-                    <td>Delay after light out</td>
-                    <td><input type="number" id="numLightOutDelay" min="0" max="2000" size="3"> msec</td>
-                </tr> -->
                 <tr>
                     <td>Minimal PIR HIGHs</td>
-                    <td><input type="number" id="numMinHighPIRs" min="1" max="100" size="3"> → movement detection</td>
+                    <td><input type="number" id="numMinHighPIRs" min="1" max="100" size="3"> → movement</td>
                 </tr>
                 <tr>
                     <td>Loop's delay</td>
-                    <td><input type="number" id="numMsMainDelay" min="5" max="500" size="3"> msec</td>
+                    <td><input type="number" id="numMsMainDelay" min="1" max="100" size="3"> msec</td>
                 </tr>
             </table>
             <input type="button" id='btnOk' value="OK" onclick="SaveConfig()" class="big">
@@ -66,9 +65,8 @@
             <a href="current_data.html">Current Data</a> <br>
             <a href="get_ldr_vals">Last n LDR Values (raw data)</a> <br>
             <a href="msgs">System Test Messages</a> <br>
-            <br>
-            <a href="otaUpdate">OTA Update</a>
         </p>
+        <button class="big" onclick="OTA()">OTA Update</button>
     </div>
 </body>
 

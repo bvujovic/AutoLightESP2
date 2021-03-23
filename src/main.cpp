@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <LinkedList.h>
 
+#include <ESP8266httpUpdate.h>
+
 #include <WiFiServerBasics.h>
 ESP8266WebServer server(80);
 
@@ -20,14 +22,10 @@ EasyINI ei("/config.ini");
 const byte pinPhotoRes = A0; // pin za LDR i taster za WiFi
 const byte pinPIR = D0;
 // OUTPUT
-const byte pinLight = D8; // LED svetlo za osvetljavanje prostorije
-const byte pinLed = 2;    // ugradjena LED dioda na ESPu - upaljena kada radi wifi
+const byte pinLight = D8;        // LED svetlo za osvetljavanje prostorije
+const byte pinLed = LED_BUILTIN; // ugradjena LED dioda na ESPu - upaljena kada radi wifi
 
-const int eepromPos = 88; // pozicija u EEPROMu na kojoj ce se cuvati podatak da li se wifi pali ili ne pri sledecm resetu
-
-const ulong itvOtaTime = 1 * 60 * 1000; // vreme (u ms) koje ce aparat provesti u cekanju da pocne OTA update
-const ulong itvModWait = 2 * 60 * 1000; // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
-// posle toga se aparat vraca na standardna podesavanja - kratko (npr 45sec) svetlo, podrazumevanog intenziteta.
+const ulong itvOtaTime = 1 * 60 * 1000; // vreme koje ce aparat provesti u cekanju da pocne lokalni OTA update
 
 // variables
 bool isLightOn;              // da li je svetlo upaljeno ili ne
@@ -117,6 +115,7 @@ void WiFiOn()
 {
     SetLight(true);
     WiFi.mode(WIFI_STA);
+    //? if (WiFi.status() != WL_CONNECTED)
     ConnectToWiFi();
     SetupIPAddress(40);
     WebServerStart();
@@ -176,14 +175,6 @@ void HandleMsgs()
     server.send(200, "text/plain", EasyFS::readf());
 }
 
-void HandleOTA()
-{
-    server.send(200, "text/plain", "ESP is waiting for OTA updates...");
-    msLastServerAction = millis();
-    isOtaOn = true;
-    ArduinoOTA.begin();
-}
-
 void HandleNotFound()
 {
     String s = "Page Not Found\n\n";
@@ -193,6 +184,25 @@ void HandleNotFound()
     for (int i = 0; i < server.args(); i++)
         s += " " + server.argName(i) + ": " + server.arg(i) + "\n";
     server.send(404, "text/plain", s);
+}
+
+void HandleOTA()
+{
+    server.send(200, "text/plain", "ESP is waiting for OTA updates...");
+    String type = server.arg("type");
+    if (type == "web") // HTTP Server Update
+    {
+        delay(100); // kratko cekanje da se server.send() izvrsi
+        setts.setHttpServerUpdate(true);
+        setts.saveToFile();
+        ESP.reset();
+    }
+    if (type == "local") // PlatformIO Update
+    {
+        msLastServerAction = millis();
+        isOtaOn = true;
+        ArduinoOTA.begin();
+    }
 }
 
 // Konfiguracija veb servera i njegovo pokretanje.
@@ -226,9 +236,29 @@ void setup()
 
     Serial.begin(115200);
     LittleFS.begin();
-    ReadConfigFile();
     EasyFS::setFileName("/msgs.log", true);
-
+    newMsg("httpServerUpdate", setts.httpServerUpdate);
+    ReadConfigFile();
+    if (setts.httpServerUpdate)
+    {
+        WiFi.mode(WIFI_STA);
+        ConnectToWiFi();
+        setts.setHttpServerUpdate(false);
+        setts.saveToFile();
+        WiFiClient client;
+        ESPhttpUpdate.setLedPin(pinLed, LOW);
+        HTTPUpdateResult res = ESPhttpUpdate.updateFS(client, "http://kingtrader.info/esp/AutoLightESP2/littlefs.bin");
+        if (res == HTTP_UPDATE_OK)
+        {
+            res = ESPhttpUpdate.update(client, "http://kingtrader.info/esp/AutoLightESP2/firmware.bin");
+            if (res == HTTP_UPDATE_OK)
+                newMsg("update OK!");
+            else
+                newMsg("HTTP Server Update Error: " + ESPhttpUpdate.getLastErrorString());
+        }
+        else
+            newMsg("HTTP Server Update FS Error: " + ESPhttpUpdate.getLastErrorString());
+    }
     WiFiOn();
 }
 
@@ -300,7 +330,7 @@ void loop()
         msLastShortClick = cntShortClicks = 0;
     }
 
-    if (!isLightOn && msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > itvModWait)
+    if (!isLightOn && msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > setts.rememberMode)
     {
         isLongLight = isLight2 = false;
         msModLastSet = 0;
