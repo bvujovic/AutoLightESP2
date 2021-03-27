@@ -13,7 +13,7 @@ private:
 
 public:
     uint lightOn;                 // koliko je sekundi svetlo upaljeno posle poslednjeg signala sa PIR-a
-    uint rememberMode;            // vreme cekanja na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
+    uint rememberMode;            // vreme cekanja (u minutima) na ponovnu upotrebu moda (dugo i/ili slabo svetlo).
                                   // posle toga se aparat vraca na standardna podesavanja - kratko svetlo podrazumevanog intenziteta.
     uint longLightOn;             // koliko je minuta dugo svetlo upaljeno posle poslednjeg signala sa PIR-a
     uint lightLevel = MAX_LEVEL;  // jacina LED svetla (0-100)

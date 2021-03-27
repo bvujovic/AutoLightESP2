@@ -15,7 +15,9 @@ LdrVals ldrs;
 #include "EasyINI.h"
 EasyINI ei("/config.ini");
 
-#include "EasyFS.h"
+//B #include "EasyFS.h"
+#include "StringLogger.h"
+StringLogger<10> *ss;
 
 // pins
 // INPUT
@@ -45,11 +47,13 @@ bool isLongLight = false;    // da li se je trajanje svetla dugo (npr 5min) ili 
 bool isLight2 = false;       // da li se koristi drugo svetlo (drugi intenzitet, slabije npr)
 int i = 0;
 
-void newMsg(const String &s) { EasyFS::addf(String(millis()) + " - " + s); }
-void newMsg(const String &s, int x) { EasyFS::addf(String(millis()) + " - " + s + "=" + String(x)); }
+void newMsg(const String &s) { ss->addSaveDelayed(String(millis()) + " - " + s); }
+void newMsg(const String &s, int x) { ss->addSaveDelayed(String(millis()) + " - " + s + "=" + String(x)); }
 
 #include "Setts.h"
 Setts setts;
+
+uint readPhotoRes() { return map(analogRead(pinPhotoRes), 0, 1023, 0, setts.MAX_LEVEL); }
 
 LinkedList<String> statuses = LinkedList<String>(); // lista statusa aparata
 int idStatus = 0;
@@ -87,14 +91,15 @@ void SetLight(bool isOn)
     if (isLightOn != isOn)
     {
         isLightOn = isOn;
+        uint valPhotoRes = readPhotoRes();
         // kôd koji brani brzo pali-gasenje svetla zbog preblizu postavljenih granica setts.backlight...
-        if (ms < msLastLightChange + 1000)
+        if (ms < msLastLightChange + 1000 && valPhotoRes < setts.MAX_LEVEL)
         {
             cntFastOnOff++;
             if (cntFastOnOff >= 2) // setts.backlight... granice se razmicu ako se dese 2 brza ON<->OFF prelaza
             {
                 const ulong step = 10;
-                if (setts.backlightLimitHigh + step < setts.MAX_LEVEL * 0.9)
+                if (setts.backlightLimitHigh + step <= setts.MAX_LEVEL * 0.9)
                     setts.backlightLimitHigh += step;
                 else if (setts.backlightLimitLow - step >= 0)
                     setts.backlightLimitLow -= step;
@@ -172,7 +177,7 @@ void HandleLdrVals()
 void HandleMsgs()
 {
     msLastServerAction = millis();
-    server.send(200, "text/plain", EasyFS::readf());
+    server.send(200, "text/plain", ss->readFromFile());
 }
 
 void HandleNotFound()
@@ -236,8 +241,7 @@ void setup()
 
     Serial.begin(115200);
     LittleFS.begin();
-    EasyFS::setFileName("/msgs.log", true);
-    newMsg("httpServerUpdate", setts.httpServerUpdate);
+    ss = new StringLogger<10>("/strings.log", true, 4000);
     ReadConfigFile();
     if (setts.httpServerUpdate)
     {
@@ -283,7 +287,7 @@ void loop()
     if (!valPir && msStartPir != 0)
         msStartPir = msLastPir = 0;
 
-    int valPhotoRes = map(analogRead(pinPhotoRes), 0, 1023, 0, setts.MAX_LEVEL);
+    int valPhotoRes = readPhotoRes();
     valPhotoRes = ldrs.Add(valPhotoRes);
 
     if (valPhotoRes > backlightLimit) // prostorija je dovoljno osvetljena
@@ -330,7 +334,7 @@ void loop()
         msLastShortClick = cntShortClicks = 0;
     }
 
-    if (!isLightOn && msModLastSet != 0 && ms > msModLastSet && ms - msModLastSet > setts.rememberMode)
+    if (!isLightOn && msModLastSet != 0 && ms > msModLastSet + setts.rememberMode * 60 * 1000)
     {
         isLongLight = isLight2 = false;
         msModLastSet = 0;
@@ -351,4 +355,6 @@ void loop()
 
         server.handleClient();
     }
+
+    ss->refresh(ms);
 }

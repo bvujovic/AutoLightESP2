@@ -7,16 +7,16 @@ bool Setts::load()
     {
         //B lightOn = ei->getInt("lightOn");
         setLightOn(ei->getInt("lightOn"));
-        setRememberMode(ei->getInt("lightOn"));
-        longLightOn = ei->getInt("longLightOn");
-        lightLevel = ei->getInt("lightLevel");
-        lightLevel2 = ei->getInt("lightLevel2");
-        backlightLimitLow = ei->getInt("backlightLimitLow");
-        backlightLimitHigh = ei->getInt("backlightLimitHigh");
-        wifiOn = ei->getInt("wifiOn");
-        msMainDelay = ei->getInt("msMainDelay");
-        minHighPIRs = ei->getInt("minHighPIRs");
-        httpServerUpdate = ei->getInt("httpServerUpdate");
+        setRememberMode(ei->getInt("rememberMode"));
+        setLongLightOn(ei->getInt("longLightOn"));
+        setLightLevel(ei->getInt("lightLevel"));
+        setLightLevel2(ei->getInt("lightLevel2"));
+        setBacklightLimitLow(ei->getInt("backlightLimitLow"));
+        setBacklightLimitHigh(ei->getInt("backlightLimitHigh"));
+        setWifiOn(ei->getInt("wifiOn"));
+        setMsMainDelay(ei->getInt("msMainDelay"));
+        setMinHighPIRs(ei->getInt("minHighPIRs"));
+        setHttpServerUpdate(ei->getInt("httpServerUpdate"));
         ei->close();
         return true;
     }
@@ -37,6 +37,7 @@ void Setts::saveToMem(ESP8266WebServer &server)
     setWifiOn(server.arg("wifiOn").toInt());
     setMsMainDelay(server.arg("msMainDelay").toInt());
     setMinHighPIRs(server.arg("minHighPIRs").toInt());
+    // setHttpServerUpdate() ovde nije potreban
 }
 
 void Setts::saveToFile()
